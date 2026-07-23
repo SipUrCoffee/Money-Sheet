@@ -234,16 +234,16 @@
                         
                         <!-- Filters -->
                         <div class="flex flex-wrap items-center gap-2">
-                            <!-- Filter Bulan -->
-                            <div class="relative min-w-[140px] flex-1 sm:flex-none">
-                                <select id="monthFilter" class="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 py-1.5 pl-3 pr-8 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors shadow-sm font-medium">
-                                    <option value="all">Semua Bulan</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                            <!-- Filter Tanggal -->
+                            <div class="relative min-w-[130px] flex-1 sm:flex-none flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 transition-colors shadow-sm">
+                                <input type="date" id="dateFilter" class="w-full appearance-none bg-transparent text-slate-700 dark:text-slate-300 py-1.5 pl-3 pr-2 text-xs focus:outline-none font-medium cursor-pointer">
+                                <button id="clearDateBtn" class="px-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 text-xs hidden" title="Hapus Filter Tanggal">
+                                    <i class="fa-solid fa-times"></i>
+                                </button>
                             </div>
 
                             <!-- Filter Jenis -->
-                            <div class="relative min-w-[130px] flex-1 sm:flex-none">
+                            <div class="relative min-w-[110px] flex-1 sm:flex-none">
                                 <select id="typeFilter" class="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 py-1.5 pl-3 pr-8 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors shadow-sm font-medium">
                                     <option value="all">Semua Jenis</option>
                                     <option value="Income">Income</option>
@@ -252,6 +252,15 @@
                                     <option value="Saving">Saving</option>
                                 </select>
                                 <i class="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
+                            </div>
+
+                            <!-- Sort Tanggal -->
+                            <div class="relative min-w-[120px] flex-1 sm:flex-none">
+                                <select id="sortFilter" class="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 py-1.5 pl-3 pr-8 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors shadow-sm font-medium">
+                                    <option value="desc">Tgl: Terbaru</option>
+                                    <option value="asc">Tgl: Terlama</option>
+                                </select>
+                                <i class="fa-solid fa-sort absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none"></i>
                             </div>
                         </div>
                     </div>
@@ -312,10 +321,10 @@
     <script>
         /**
          * ==========================================
-         * PENTING: PENGATURAN SCRIPT_URL
+         * SCRIPT URL (Telah Disetel)
          * ==========================================
          */
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyl_ns6WWwcotwyrXEZPGA-w37oBB9Gxfgbud5YBb6--ARJE8MlK_HFQvD4GC0lNJWy_w/exec'; // <-- PASTE URL WEB APP ANDA DI SINI
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyl_ns6WWwcotwyrXEZPGA-w37oBB9Gxfgbud5YBb6--ARJE8MlK_HFQvD4GC0lNJWy_w/exec';
         
         // Konstanta Limit
         const EXPENSE_LIMIT = 4500000;
@@ -337,17 +346,20 @@
         const inputType = document.getElementById('inputType');
         const inputAmount = document.getElementById('inputAmount');
         const minusHint = document.getElementById('minusHint');
-        const monthFilterEl = document.getElementById('monthFilter');
+        const dateFilterEl = document.getElementById('dateFilter');
+        const clearDateBtn = document.getElementById('clearDateBtn');
         const typeFilterEl = document.getElementById('typeFilter');
+        const sortFilterEl = document.getElementById('sortFilter');
 
         const darkModeBtn = document.getElementById('darkModeBtn');
         const htmlElement = document.documentElement;
         
-        // Cek preferensi user sebelumnya atau preferensi sistem
-        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        // Mode Light sebagai utama (default)
+        if (localStorage.theme === 'dark') {
             htmlElement.classList.add('dark');
         } else {
             htmlElement.classList.remove('dark');
+            localStorage.theme = 'light';
         }
 
         darkModeBtn.addEventListener('click', () => {
@@ -405,25 +417,35 @@
         };
 
         const renderDashboard = () => {
-            const monthFilter = monthFilterEl.value;
+            const dateFilter = dateFilterEl.value;
             const typeFilter = typeFilterEl.value;
+            const sortFilter = sortFilterEl.value;
             
-            // Filter Data Berdasarkan Bulan dan Jenis
+            // Toggle clear button
+            if (dateFilter) clearDateBtn.classList.remove('hidden');
+            else clearDateBtn.classList.add('hidden');
+
+            // Filter Data Berdasarkan Tanggal dan Jenis
             let filteredData = appData.filter(item => {
-                let passMonth = true;
+                let passDate = true;
                 let passType = true;
 
-                if (monthFilter !== 'all') {
-                    const date = new Date(item.date);
-                    const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    passMonth = (monthYear === monthFilter);
+                if (dateFilter) {
+                    const itemDate = new Date(item.date);
+                    if (!isNaN(itemDate)) {
+                        // Memastikan format YYYY-MM-DD aman pada seluruh zona waktu browser
+                        const itemStr = `${itemDate.getFullYear()}-${String(itemDate.getMonth() + 1).padStart(2, '0')}-${String(itemDate.getDate()).padStart(2, '0')}`;
+                        passDate = (itemStr === dateFilter);
+                    } else {
+                        passDate = false;
+                    }
                 }
 
                 if (typeFilter !== 'all') {
                     passType = (item.type === typeFilter);
                 }
 
-                return passMonth && passType;
+                return passDate && passType;
             });
 
             let tIncome = 0, tExpenseNet = 0, tExpenseDisplay = 0, tMonthly = 0, tSaving = 0;
@@ -436,17 +458,20 @@
                 emptyState.classList.add('hidden');
                 emptyState.classList.remove('flex');
                 
-                const sortedData = [...filteredData].sort((a, b) => new Date(b.date) - new Date(a.date));
+                // Urutkan Data (Sort) berdasarkan tanggal
+                const sortedData = [...filteredData].sort((a, b) => {
+                    if (sortFilter === 'asc') return new Date(a.date) - new Date(b.date);
+                    return new Date(b.date) - new Date(a.date); // default desc
+                });
 
                 sortedData.forEach(item => {
                     const amt = Number(item.amount);
                     
-                    // Kalkulasi Total untuk Summary Cards (menggunakan seluruh data yang tervisualisasi, atau semua data)
-                    // Catatan: Umumnya Summary Cards mencerminkan data yang terfilter.
+                    // Kalkulasi Total untuk Summary Cards
                     if (item.type === 'Income') tIncome += amt;
                     else if (item.type === 'Expense') {
-                        tExpenseNet += amt; 
-                        if (amt > 0) tExpenseDisplay += amt; 
+                        tExpenseNet += amt; // Net dihitung untuk kalkulasi limit/saldo
+                        if (amt > 0) tExpenseDisplay += amt; // Display hanya menjumlahkan nominal positif
                     }
                     else if (item.type === 'Monthly') tMonthly += amt;
                     else if (item.type === 'Saving') tSaving += amt;
@@ -499,9 +524,7 @@
                 });
             }
 
-            // Update Cards (Based on Filtered Data or Global Data)
-            // Catatan: Jika ingin total selalu merefleksikan seluruh data global terlepas dari filter tabel, 
-            // kita harus menghitung ulang berdasarkan `appData`. Disini disesuaikan mengikuti filter agar relavan.
+            // Update Cards (Gunakan tExpenseNet untuk saldo asli, tExpenseDisplay untuk tampilan Total Expense)
             const totalBalance = tIncome - tExpenseNet - tMonthly - tSaving; 
             
             const strBalance = formatRupiah(totalBalance);
@@ -528,7 +551,7 @@
             adjustFontSize(elMonthly, strMonthly);
             adjustFontSize(elSaving, strSaving);
 
-            // Sisa Limit Expense
+            // Sisa Limit Expense (menggunakan tExpenseNet agar nilai minus menambah limit)
             const sisaExpense = EXPENSE_LIMIT - tExpenseNet;
             const elExpenseLimit = document.getElementById('expenseLimit');
             elExpenseLimit.textContent = formatRupiah(sisaExpense);
@@ -543,29 +566,8 @@
             else elMonthlyLimit.className = "font-semibold text-slate-700 dark:text-slate-300";
         };
 
-        const setupDateFilters = () => {
-            const currentSelected = monthFilterEl.value;
-            const options = new Set();
-            
-            appData.forEach(item => {
-                const d = new Date(item.date);
-                if(!isNaN(d)) {
-                    options.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-                }
-            });
-
-            monthFilterEl.innerHTML = '<option value="all">Semua Bulan</option>';
-            
-            Array.from(options).sort().reverse().forEach(opt => {
-                const [year, month] = opt.split('-');
-                const monthName = new Date(year, month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
-                const isSelected = opt === currentSelected ? 'selected' : '';
-                monthFilterEl.innerHTML += `<option value="${opt}" ${isSelected}>${monthName}</option>`;
-            });
-        };
-
         const fetchData = async () => {
-            if(!SCRIPT_URL) {
+            if(!SCRIPT_URL || SCRIPT_URL.includes('PASTE_URL_WEB_APP_ANDA_DISINI')) {
                 document.getElementById('urlWarning').classList.remove('hidden');
                 return;
             }
@@ -579,7 +581,6 @@
                 if(result.status === 'error') throw new Error(result.message);
                 
                 appData = result;
-                setupDateFilters();
                 renderDashboard();
             } catch (error) {
                 showToast("Gagal mengambil data dari Spreadsheet", 'error');
@@ -593,7 +594,7 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if(!SCRIPT_URL) {
+            if(!SCRIPT_URL || SCRIPT_URL.includes('PASTE_URL_WEB_APP_ANDA_DISINI')) {
                 showToast("URL Web App belum diatur!", 'error');
                 return;
             }
@@ -622,7 +623,7 @@
                     inputAmount.setAttribute('min', '1');
                     minusHint.classList.add('hidden');
                     
-                    await fetchData();
+                    await fetchData(); // Refresh data
                 } else throw new Error(result.message);
             } catch (error) {
                 showToast("Gagal menyimpan data", 'error');
@@ -644,9 +645,15 @@
             }
         });
 
-        // Trigger render when filters change
-        monthFilterEl.addEventListener('change', renderDashboard);
+        // Trigger render when filters and sort change
+        dateFilterEl.addEventListener('change', renderDashboard);
         typeFilterEl.addEventListener('change', renderDashboard);
+        sortFilterEl.addEventListener('change', renderDashboard);
+        
+        clearDateBtn.addEventListener('click', () => {
+            dateFilterEl.value = '';
+            renderDashboard();
+        });
 
         const modal = document.getElementById('deleteModal');
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
@@ -691,7 +698,7 @@
                 if (result.status === 'success') {
                     showToast("Data dihapus!");
                     closeDeleteModal();
-                    await fetchData(); 
+                    await fetchData(); // Refresh data
                 } else throw new Error(result.message);
             } catch (error) {
                 showToast("Gagal menghapus data", 'error');
